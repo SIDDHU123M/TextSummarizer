@@ -139,175 +139,77 @@
         </div>
     </div>
 
-    <script>
-        // Initialize Three.js background with improved visuals
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({ 
-            canvas: document.getElementById('bgCanvas'), 
-            alpha: true,
-            antialias: true 
-        });
-        renderer.setPixelRatio(window.devicePixelRatio);
-        renderer.setSize(window.innerWidth, window.innerHeight);
+<script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('summarizer', () => ({
+            inputText: '',
+            summaryText: '',
+            isProcessing: false,
+            compressionRate: 0.5,
+            algorithm: 'extractive',
+            wordCount: 0,
+            isDark: true,
+            model: null,
 
-        // Create particles with better aesthetics
-        const particlesGeometry = new THREE.BufferGeometry();
-        const particlesCount = 2000;
-        const posArray = new Float32Array(particlesCount * 3);
-        const colors = new Float32Array(particlesCount * 3);
+            async init() {
+                try {
+                    // If you want to load the model from a local path, adjust it here
+                    const model = await tf.loadLayersModel('./model.json')
+                    console.log('Model loaded successfully!');
+                } catch (error) {
+                    console.error('Error loading model:', error);
+                }
+            },
 
-        for(let i = 0; i < particlesCount * 3; i++) {
-            posArray[i] = (Math.random() - 0.5) * 10;
-            colors[i] = Math.random();
-        }
+            toggleTheme() {
+                this.isDark = !this.isDark;
+                document.documentElement.classList.toggle('dark');
+            },
 
-        particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
-        particlesGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            updateWordCount() {
+                this.wordCount = this.inputText.trim().split(/\s+/).length;
+            },
 
-        const particlesMaterial = new THREE.PointsMaterial({
-            size: 0.005,
-            vertexColors: true,
-            blending: THREE.AdditiveBlending,
-            transparent: true
-        });
+            async generateSummary() {
+                if (!this.inputText.trim()) {
+                    alert('Please enter some text to summarize');
+                    return;
+                }
 
-        const particlesMesh = new THREE.Points(particlesGeometry, particlesMaterial);
-        scene.add(particlesMesh);
-        camera.position.z = 3;
+                this.isProcessing = true;
 
-        // Improved animation
-        let mouseX = 0;
-        let mouseY = 0;
-        document.addEventListener('mousemove', (event) => {
-            mouseX = event.clientX / window.innerWidth - 0.5;
-            mouseY = event.clientY / window.innerHeight - 0.5;
-        });
-
-        function animate() {
-            requestAnimationFrame(animate);
-            particlesMesh.rotation.y += 0.001;
-            particlesMesh.rotation.x += Math.sin(mouseY) * 0.0003;
-            particlesMesh.rotation.z += Math.cos(mouseX) * 0.0003;
-            renderer.render(scene, camera);
-        }
-        animate();
-
-        // Handle window resize
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-
-        document.addEventListener('alpine:init', () => {
-            Alpine.data('summarizer', () => ({
-                inputText: '',
-                summaryText: '',
-                isProcessing: false,
-                compressionRate: 0.5,
-                algorithm: 'extractive',
-                wordCount: 0,
-                isDark: true,
-                model: null,
-
-                async init() {
-                    try {
-                        this.model = await tf.loadLayersModel('https://storage.googleapis.com/tfjs-models/tfjs/universal-sentence-encoder/1/model.json');
-                    } catch (error) {
-                        console.error('Error loading model:', error);
+                try {
+                    if (this.algorithm === 'extractive') {
+                        this.summaryText = await this.extractiveSummarization(this.inputText);
+                    } else {
+                        this.summaryText = await this.frequencyBasedSummarization(this.inputText);
                     }
-                },
+                } catch (error) {
+                    console.error('Error generating summary:', error);
+                    alert('Error generating summary. Please try again.');
+                } finally {
+                    this.isProcessing = false;
+                }
+            },
 
-                toggleTheme() {
-                    this.isDark = !this.isDark;
-                    document.documentElement.classList.toggle('dark');
-                },
+            async extractiveSummarization(text) {
+                const sentences = text.match(/[^.!?]+[.!?]+/g) || [];
+                if (sentences.length === 0) return text;
 
-                updateWordCount() {
-                    this.wordCount = this.inputText.trim().split(/\s+/).length;
-                },
+                try {
+                    const encodedSentences = await this.model.embed(sentences);
+                    const sentenceEmbeddings = await encodedSentences.array();
+                    const sentenceScores = [];
 
-                async generateSummary() {
-                    if (!this.inputText.trim()) {
-                        alert('Please enter some text to summarize');
-                        return;
-                    }
-
-                    this.isProcessing = true;
-
-                    try {
-                        if (this.algorithm === 'extractive') {
-                            this.summaryText = await this.extractiveSummarization(this.inputText);
-                        } else {
-                            this.summaryText = await this.frequencyBasedSummarization(this.inputText);
-                        }
-                    } catch (error) {
-                        console.error('Error generating summary:', error);
-                        alert('Error generating summary. Please try again.');
-                    } finally {
-                        this.isProcessing = false;
-                    }
-                },
-
-                async extractiveSummarization(text) {
-                    const sentences = text.match(/[^.!?]+[.!?]+/g) || [];
-                    if (sentences.length === 0) return text;
-
-                    try {
-                        const encodedSentences = await use.load().then(model => {
-                            return model.embed(sentences);
-                        });
-
-                        const sentenceEmbeddings = await encodedSentences.array();
-                        const sentenceScores = [];
-
-                        for (let i = 0; i < sentenceEmbeddings.length; i++) {
-                            let score = 0;
-                            for (let j = 0; j < sentenceEmbeddings.length; j++) {
-                                if (i !== j) {
-                                    score += this.cosineSimilarity(sentenceEmbeddings[i], sentenceEmbeddings[j]);
-                                }
+                    for (let i = 0; i < sentenceEmbeddings.length; i++) {
+                        let score = 0;
+                        for (let j = 0; j < sentenceEmbeddings.length; j++) {
+                            if (i !== j) {
+                                score += this.cosineSimilarity(sentenceEmbeddings[i], sentenceEmbeddings[j]);
                             }
-                            sentenceScores.push(score);
                         }
-
-                        const numSentences = Math.max(1, Math.floor(sentences.length * this.compressionRate));
-                        const topSentences = sentenceScores
-                            .map((score, idx) => ({ score, idx }))
-                            .sort((a, b) => b.score - a.score)
-                            .slice(0, numSentences)
-                            .sort((a, b) => a.idx - b.idx)
-                            .map(item => sentences[item.idx]);
-
-                        return topSentences.join(' ');
-                    } catch (error) {
-                        console.error('Error in extractive summarization:', error);
-                        return this.frequencyBasedSummarization(text); // Fallback to frequency-based
+                        sentenceScores.push(score);
                     }
-                },
-
-                cosineSimilarity(a, b) {
-                    const dotProduct = a.reduce((sum, val, i) => sum + val * b[i], 0);
-                    const normA = Math.sqrt(a.reduce((sum, val) => sum + val * val, 0));
-                    const normB = Math.sqrt(b.reduce((sum, val) => sum + val * val, 0));
-                    return dotProduct / (normA * normB);
-                },
-
-                async frequencyBasedSummarization(text) {
-                    const sentences = text.match(/[^.!?]+[.!?]+/g) || [];
-                    if (sentences.length === 0) return text;
-
-                    const wordFreq = {};
-                    const words = text.toLowerCase().match(/\b\w+\b/g) || [];
-                    words.forEach(word => {
-                        wordFreq[word] = (wordFreq[word] || 0) + 1;
-                    });
-
-                    const sentenceScores = sentences.map(sentence => {
-                        const sentenceWords = sentence.toLowerCase().match(/\b\w+\b/g) || [];
-                        return sentenceWords.reduce((score, word) => score + wordFreq[word], 0) / sentenceWords.length;
-                    });
 
                     const numSentences = Math.max(1, Math.floor(sentences.length * this.compressionRate));
                     const topSentences = sentenceScores
@@ -318,63 +220,101 @@
                         .map(item => sentences[item.idx]);
 
                     return topSentences.join(' ');
-                },
-
-                async handleFileUpload(event) {
-                    const file = event.target.files[0];
-                    if (!file) return;
-                    
-                    try {
-                        const text = await file.text();
-                        this.inputText = text;
-                        this.updateWordCount();
-                    } catch (error) {
-                        console.error('Error reading file:', error);
-                        alert('Error reading file. Please try again.');
-                    }
-                    event.target.value = '';
-                },
-
-                clearText() {
-                    if (confirm('Are you sure you want to clear all content?')) {
-                        this.inputText = '';
-                        this.summaryText = '';
-                        this.wordCount = 0;
-                    }
-                },
-
-                async copyToClipboard() {
-                    if (!this.summaryText) {
-                        alert('No summary to copy');
-                        return;
-                    }
-                    try {
-                        await navigator.clipboard.writeText(this.summaryText);
-                        alert('Summary copied to clipboard!');
-                    } catch (err) {
-                        console.error('Failed to copy:', err);
-                        alert('Failed to copy text. Please try again.');
-                    }
-                },
-
-                downloadSummary() {
-                    if (!this.summaryText) {
-                        alert('No summary to download');
-                        return;
-                    }
-
-                    const blob = new Blob([this.summaryText], { type: 'text/plain' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `summary-${new Date().toISOString().slice(0,10)}.txt`;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
+                } catch (error) {
+                    console.error('Error in extractive summarization:', error);
+                    return this.frequencyBasedSummarization(text); // Fallback to frequency-based
                 }
-            }));
-        });
-    </script>
+            },
+
+            cosineSimilarity(a, b) {
+                const dotProduct = a.reduce((sum, val, i) => sum + val * b[i], 0);
+                const normA = Math.sqrt(a.reduce((sum, val) => sum + val * val, 0));
+                const normB = Math.sqrt(b.reduce((sum, val) => sum + val * val, 0));
+                return dotProduct / (normA * normB);
+            },
+
+            async frequencyBasedSummarization(text) {
+                const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+                if (sentences.length === 0) return text;
+
+                const wordFreq = {};
+                const words = text.toLowerCase().match(/\b\w+\b/g) || [];
+                words.forEach(word => {
+                    wordFreq[word] = (wordFreq[word] || 0) + 1;
+                });
+
+                const sentenceScores = sentences.map(sentence => {
+                    const sentenceWords = sentence.toLowerCase().match(/\b\w+\b/g) || [];
+                    return sentenceWords.reduce((score, word) => score + wordFreq[word], 0) / sentenceWords.length;
+                });
+
+                const numSentences = Math.max(1, Math.floor(sentences.length * this.compressionRate));
+                const topSentences = sentenceScores
+                    .map((score, idx) => ({ score, idx }))
+                    .sort((a, b) => b.score - a.score)
+                    .slice(0, numSentences)
+                    .sort((a, b) => a.idx - b.idx)
+                    .map(item => sentences[item.idx]);
+
+                return topSentences.join(' ');
+            },
+
+            async handleFileUpload(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                try {
+                    const text = await file.text();
+                    this.inputText = text;
+                    this.updateWordCount();
+                } catch (error) {
+                    console.error('Error reading file:', error);
+                    alert('Error reading file. Please try again.');
+                }
+                event.target.value = '';
+            },
+
+            clearText() {
+                if (confirm('Are you sure you want to clear all content?')) {
+                    this.inputText = '';
+                    this.summaryText = '';
+                    this.wordCount = 0;
+                }
+            },
+
+            async copyToClipboard() {
+                if (!this.summaryText) {
+                    alert('No summary to copy');
+                    return;
+                }
+                try {
+                    await navigator.clipboard.writeText(this.summaryText);
+                    alert('Summary copied to clipboard!');
+                } catch (err) {
+                    console.error('Failed to copy:', err);
+                    alert('Failed to copy text. Please try again.');
+                }
+            },
+
+            downloadSummary() {
+                if (!this.summaryText) {
+                    alert('No summary to download');
+                    return;
+                }
+
+                const blob = new Blob([this.summaryText], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `summary-${new Date().toISOString().slice(0, 10)}.txt`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+        }));
+    });
+</script>
+
 </body>
 </html>
