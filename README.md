@@ -1,6 +1,6 @@
 # TextSummarizer
 
-This is a Text Summarizer application that runs entirely in your browser without requiring any API key. It leverages advanced Natural Language Processing (NLP) techniques to summarize text input directly in the browser. The application uses libraries such as TensorFlow.js and Universal Sentence Encoder for text processing and summarization. Additionally, it features a visually appealing background created with Three.js.
+This is a Text Summarizer application that runs entirely in your browser without requiring any API key. It leverages advanced Natural Language Processing (NLP) techniques to summarize text input directly in the browser. The application uses libraries such as TensorFlow.js and Universal Sentence Encoder for text processing and summarization. Additionally, it features a visually appealing background created with TensorFlow and Three.js.
 
 ## Features
 - **No API Key Required**: The summarization process is handled locally in the browser.
